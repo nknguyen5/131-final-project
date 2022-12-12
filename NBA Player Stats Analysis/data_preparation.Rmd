@@ -1,0 +1,135 @@
+---
+title: "NBA Players Statistics Analysis"
+subtitle: "Data Preparation"
+author: 
+  - Ngoc Nguyen
+
+date: "12/07/2022"
+output: 
+  html_document:
+    theme: cosmo
+    toc: true
+    number_sections: true
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                     # results = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      #fig.show = 'hide',
+                      fig.align='left')
+```
+
+# Data Preparation
+
+The data used for the analysis constitutes of NBA player data for the season from the 2018-2019 season to the 2021-2022 season.This combined data for the season is sourced from <https://www.nbastuffer.com>.
+
+This section presents the preparation of the data for further analysis and modeling. The following actions have been performed on the data:
+
+- Load the Dataset
+
+- Rename the columns 
+
+- Drop columns that are not usefull for the analysis
+
+- Save the data as .RData
+
+- Extract codebook 
+
+- Save the codebook as html or pdf
+
+
+# Load the required Libraries
+
+```{r Load Libraries}
+
+source('config/00_dependencies.R')
+
+```
+
+# Load Data
+
+```{r Load Data}
+
+nba_data <- read_csv("data/nba_data.csv")
+
+nba_labels <- read_csv("data/nba_data_labels.csv")
+
+```
+
+# Rename Variables
+```{r Variable Names}
+
+colnames(nba_data)
+colnames(nba_labels)
+
+```
+
+# Rename Variables
+```{r Rename Variables}
+
+colnames(nba_data) <- nba_labels$name
+
+colnames(nba_data)
+
+```
+
+# Drop Columns 
+
+The following columns are dropped from the dataset:
+
+-`rank`. the `rank` row has no data.
+
+- `full_name`. the player name is dropped and just remain with the observations.
+
+- `season`. this is a categorical value representing the seasons for which the data was collected. We will not include this as part of the predictor variables. 
+
+```{r Drop Columns}
+
+cols <- c('rank', 'full_name', 'season')
+
+nba_data_select <- select(nba_data, -cols)
+
+colnames(nba_data_select)
+
+```
+# Save to .RData File
+```{r Save .Rdata File}
+
+nba_dataset <- data.frame(nba_data_select)
+
+save(nba_dataset, file="data/nba_dataset.RData")
+
+```
+
+
+# Create a Codebook
+```{r Create a Codebook}
+
+code <- colnames(nba_data_select)
+
+code_book <- data.frame(code)
+
+code_book$label <- nba_labels$label[3:29]
+
+code_book <- code_book %>%
+  mutate(type = map_chr(nba_data_select, typeof),
+         mean = round(map_dbl(nba_data_select, mean, na.rm=T),2), 
+         prop_miss = round(map_dbl(nba_data_select, function(x) mean(is.na(x))),4)) 
+  
+```
+
+
+# Save the Code Book
+```{r save Code Book}
+
+kable(code_book, "html", caption="Code Book") %>%
+  kable_styling(bootstrap_options = c("striped", "hover")) %>%
+  cat(., file = "outputs/code_book.html")
+
+```
+
+
+

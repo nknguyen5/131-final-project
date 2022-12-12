@@ -1,0 +1,31 @@
+name,label
+rank,team ranking
+full_name,full name of player
+team,name of the team
+pos,position the player plays
+age,age of the player
+gp,number of games played
+mpg,minutes averaged per game
+min_perc,minutes percentage of team minutes used by a player while he was on the floor
+usg_per,the percentage of team plays used by a player when they are on the floor
+to_perc,the number of turnovers a player commits per 100 possessions
+fta,the number of free throws that a player or team has attempted
+fta_perc,the percentage of a team's free throws attempted that a player has attempted while on the court
+two_pa,2-Point Field Goal Attempts Per 36 Minutes
+two_p_perc,the percentage of 2 point field goal attempts that a player makes
+three_pa,3-point field goals per 36 minutes
+three_p_perc,the percentage of 3 point field goal attempts that a player makes
+efg_perc,effective field goal percentage
+ts_perc,true shooting percentage
+ppg,points per game
+rpg,rebounds per game
+trb_perc,estimated percentage of available rebounds grabbed by the player while the player is on the court.
+apg,assists per game
+ast_perc,percentage is an estimated percentage of teammate field goals a player assisted while the player is on the court
+spg,steals per game
+bpg,blocks per game
+topg,turnovers per game
+vi,"versatility index is a metric that measures a player's ability to produce in points, assists, and rebounds. the average player will score around a five on the index, while top players score above 10"
+ortg,offensive rating - individual offensive rating is the number of points produced by a player per 100 total individual possessions.
+drtg,defensive rating - individual defensive rating estimates how many points the player allowed per 100 possessions he individually faced while staying on the court.
+season,NBA Season

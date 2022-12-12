@@ -1,0 +1,333 @@
+---
+title: "NBA Players Statistics Analysis"
+author: 
+  - Ngoc Nguyen
+
+date: "12/11/2022"
+output: 
+  html_document:
+    theme: cosmo
+    toc: true
+    number_sections: true
+  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,
+                     # results = FALSE,
+                      message = FALSE,
+                      warning = FALSE,
+                      #fig.show = 'hide',
+                      fig.align='left')
+```
+
+# Introduction
+
+For each game played in the NBA a number of statistics about the player performance are collected which provides an over viewer of player performance. This data provides us with useful information on the player's form at a particular time in the season. These statistics are available from a number of sources providing useful information about player performance from game to game. We have collected data for a combined four seasons from <https://www.nbastuffer.com>.
+
+In this analysis, we explore the possibility of predicting the player performance in the next game based on their performance statistics in the previous games. This takes a number of player statistics as predictor variables and try to predict the player's points per game (ppg). predicting the ppg given the previous player's statistics will enable us to have an idea of the form of the player and their likely performance in future games. 
+
+# Methodology for the Analysis
+
+The data analysis will follow a workflow that will involve loading of data and performing the necessary processing before fitting the predictive models. The following involves the detailed steps employed in the analysis:
+
+- **Loading Data**. Load the .RData file with all the features and the response variable. This data has been processed already by removing columns that are not necessary as well as renaming of the variable columns.
+
+- **Exploratory Data Analysis**. the exploratory data analysis explores the variables in the data to get an understanding of what pre-processing might be required. The following exploratory analysis are performed:
+
+  - Check for missing values in the data.
+  
+  - Explore the distribution of the response variable.
+  
+  - Explore descriptive statistics for both numeric and categorical variables.
+  
+  - Explore the distribution and relationship of continuous variables.
+  
+  - Explore the distribution of categorical variables.
+
+- **Train-test Split**. We create a training set and testing set for fitting our models by:
+  
+  - Split the data into train and test sets.
+  
+  - Create a train/ test object.
+  
+  - Create a validation set for model tuning.
+  
+- **Feature Engineering**. The feature engineering defines:
+
+  - Features to be used for the predictor and response variables.
+  
+  - Define the pre-processing steps to be employed before model fitting.
+  
+- **Model specification**. Specify different models to be fit for consideration.
+
+- **Model Fitting and Tuning**. 
+  
+  - Fit the specified models with the training data set. 
+  
+  - Tune the models using the validation object.
+  
+  - Obtain the performance metrics for each of the best tuned models.
+  
+- **Model Selection**. based on the performance metrics for each of the fitted models, select the best performing model to be used for the predictions.
+
+- **Prediction**. using the selected model, predict the outcomes from the test data set.
+  
+# Load the Data
+
+```{r Load Libraries}
+
+source('config/00_dependencies.R')
+
+```
+
+
+```{r Load Data}
+
+load("data/nba_dataset.RData")
+
+str(nba_dataset)
+
+```
+The loaded `nba_dataset` has a total of 27 variables with 2555 observations. Only two of the variables are of character type with the rest being numerical.  
+
+# Exploratory Data Analysis
+
+## Check for Missing Values
+
+```{r Check for Missing values}
+
+missing_total <- sum(is.na(nba_dataset))
+
+missing <- colSums(is.na(nba_dataset))
+
+missing_df <- data.frame(missing) %>%
+  filter(missing > 0)
+
+
+```
+
+The dataset has a total of `r missing_total`  missing values.
+
+The following are the variable with the missing data:
+
+`r kable(missing_df)`
+
+## Continous Variables
+
+### Filter Continous Variables
+```{r Filter Continous Variables }
+
+cont_vars <- select_if(nba_dataset, is.numeric)
+
+```
+
+
+### Descriptive Statistics
+```{r Descriptive of Continous Variables}
+
+st(cont_vars)
+
+```
+
+The total number of observations for all the variables is 2555. The range of ages for the observed players ranges from about 19 years to about 44 years. Variables that are measured in percentages ranges from 0 to a maximum of 100 whereas those measured in per unit ranges from 0 to 1. we also note variables with very wide range such as two_pa 9range from 0 to 1393), three_pa(range from 0 to 1028) and fta (with range from 0 to 858). We note that thes varying ranges in the data distribution will have to be taken care of before fitting the model. This means that we will have to standardize our predictor variables so that they fall within a similar range.
+
+The response variable of ppg (points per game) ranges from 0 to 36.1 with a mean of 8.396 and a standard deviation of 6.257. 
+
+### Continous Variables Distribution
+
+```{r Convert the Continous Variables to Long Format}
+
+continous_long <- cont_vars %>%
+  pivot_longer(colnames(cont_vars)) %>%
+  as.data.frame()
+
+head(continous_long)
+
+```
+
+```{r Histogramplots of Continous Variables, fig.cap="Fig 1. Histogram Plots of Continous Variables"}
+
+p1 <- ggplot(continous_long, aes(x = value)) +   
+  geom_histogram(aes(y = after_stat(density), bins=16)) + 
+  geom_density(col = "#1b98e0", size = 0.5) + 
+  facet_wrap(~ name, scales = "free", ncol=5, as.table=TRUE)
+
+p1 + theme(axis.text = element_text(size=6), 
+           axis.text.y = element_blank(), 
+           axis.ticks.x = element_line(),
+           axis.ticks.y = element_blank())+
+  ggtitle("Histogram Plots of Continous Variables")
+
+```
+
+We note that the response variable of ppg seems to be skewed to the right which is an indication of higher oputlier points per games observed. A number of predictor variables are equally noticed to have upper outliers making their distributions skewed to the right. This right skewness can be noticed in the following variables: `age`, `apa`, `ast_perc`,`bpg`,`fta`,`rpg`, `spg`, `three_p_perc`, `three_pa`, to_perc`, `topg`, trb_perc`, `two_pa`, `usg_per` and `vi`.
+
+the variables `min_per`, `gp`,  and `mpg` seems to have distributions that are close to uniform and the following distributions have noticeable outlines on the lowers end; `grtg` and `fta_perc`.
+
+Standardizing the variables will ensure to have all the variables with a mean of o and standard deviation of 1. 
+
+### Relationship among the Continous Variables
+
+```{r Correlation among Continous Variables, fig.cap="Fig 2. Correlation Matrix of Continous Variables"}
+
+corr <- round(cor(cont_vars), 1)
+
+ggcorrplot(corr, type = "lower",
+   outline.col = "white", lab=TRUE, lab_size=2, tl.cex=8,  tl.srt=90)+
+ggtitle("Correlation Matrix of Continous Variables")
+
+
+```
+The figure above shows the correlation plot of contentious variables together with the response variables. we note that most of the predictor variables are fairly correlated with the response variable of `ppg` with correlation coefficients ranging from 0.1 to to as high as 0.9. This is with the exception of `trb_perc` (estimated percentage of available rebounds grabbed by the player while the player is on the court) which has zero correlation with the predictor variables. This and any other variables that have minimal variance will have to be omitted from the model during the pre-processing of the data.
+
+the variables `mpg` and `min-perc` are perfectly correlated with a correlation coefficient of 1. In order to avoid the issues of multicollinearity once we fit our model, one of the two highly correlated will have to be dropped before fitting the model. This will apply to all other highly correlated variables which might bring about multicollinearity issues in our model.
+
+
+## Continous Variables
+
+We have two categorical variables in our dataset: `team` and `pos` which are the team name where the player plays and the position they play respectively. We will explore the distribution of these categorical variables and how they relate with the response variable.
+
+```{r categorical Variables}
+
+cat <- select_if(nba_dataset, is.character)
+head(cat)
+
+```
+
+### Frequency Distribution Tables
+```{r Categorical variables Frequency Tables}
+
+tbl_summary(cat) 
+
+```
+
+
+We note that the variable team has a total number of `r n_distinct(cat$team)` distinct levels whereas the variable `pos` has a total of `r n_distinct(cat$pos)`. We believe that the team to which one belongs will have an impact on the performance of a player and as such despite having these number of levels, we will maintain these categories. The coding of these categories will have to be handled in the reprocessing of the data before fitting the model. 
+
+The `pos` variable has a position indicated as `0` with only one observation. Since we do not have a `0` as position this is likely to be a missing value coded as zero. We will replace this value with `NA` so that we can handle it in the handling of missing values during the pre-processing of data. 
+
+
+```{r replace 0 with NA}
+
+nba_dataset <- nba_dataset %>%
+  mutate_at(vars(pos),
+            function(.var){
+              if_else(condition = (.var==0), # if true (i.e. the entry is 0)
+                      true = as.character(NA), # replace the value with NA
+                      false = .var) # otherwise leave it as it is
+            })
+
+```
+
+### Frequency Plots of Categorical Variables
+```{r Pivot Long of Categorical variables}
+cat <- select_if(nba_dataset, is.character)
+
+cat_long <- cat %>%
+  pivot_longer(colnames(cat)) %>%
+  as.data.frame()
+
+head(cat_long)
+```
+
+
+```{r Frequency bar Plots of categorical Variables, fig.cap="Fig 3.Frequency Plots of Categorical Variables"}
+
+p2 <- ggplot(cat_long, aes(x = value)) +    
+  geom_bar() + 
+  facet_wrap(~ name, scales = "free", ncol=4, as.table=TRUE)
+
+p2 + theme(axis.text = element_text(size=6), 
+           axis.text.x = element_text(angle=90)) +
+  ggtitle("Frequency Plots of Categorical Variables")
+
+```
+
+We note that majority of the players play in position 'G' followed by those who play in postion 'F'. The distribution of observations across the teams is fairly close to uniform ranging between about 65 to about 100 observations per team. Next, we consider how the response variable varies accross the two categorical variables.
+
+### Response Variables Across Categorical Variables
+```{r Bopxplots across Team, fig.cap="Fig 4.BoxPlots of of ppg across team"}
+
+ggplot(nba_dataset, aes(x=team, y=ppg)) + 
+    geom_boxplot() +
+  ggtitle('Boxplots of Response Variables across Teams')
+
+```
+We note that the median ppg for the various teams ranges within 5 to 10 points. The distribution of the median is fairly within the same range for all of the teams with a number of upper outlines for most of the teams. 
+
+```{r Bopxplots across Positions, fig.cap="Fig 5.BoxPlots of of ppg across pos"}
+
+ggplot(nba_dataset, aes(x=pos, y=ppg)) + 
+    geom_boxplot() +
+  ggtitle('Boxplots of Response Variables across Player Position')
+
+```
+There is no significant noticeable difference in the median ppg for the various positions. 
+
+# Train-Test Split
+
+we split the data into 80% of training data and 20% of test data. The training data is further partitioned into validation folds that are used to tune the fitted models inorder to optimize performance.
+
+```{r Train-Test Split}
+set.seed(1234) 
+
+nba_split <- initial_split(nba_dataset,
+                            pro = 4/5)
+
+nba_split
+
+```
+
+next, create a cross-validation version of a training set.
+```{r Cross Validation Set}
+set.seed(1234) 
+
+nba_train <- training(nba_split)
+nba_test <- testing(nba_split)
+
+nba_cv <- vfold_cv(nba_train)
+
+```
+
+# Feature Engineering
+
+The following feature engineering are applied to the data for model fitting:
+
+- definition the predictor and response variables
+
+- The following pre-processing is applied to the data:
+
+  - Data Standardization of all numerical variables.
+  
+  - Impute all missing values using the k-nearest neighbour method.
+  
+  - one-hot encoding of the categorical variables.
+  
+  - Omitting of highly correlated variables.
+  
+  - Omitting of variables with low variance.
+  
+```{r Feature Engineering}
+
+nba_recipe <- recipe(ppg ~., data = nba_dataset) %>% 
+  step_normalize(all_numeric()) %>% 
+  step_impute_knn(all_predictors) %>% 
+  step_dummy(team, pos, one_hot = TRUE) %>% 
+  step_corr(all_predictors(), - mpg) %>% 
+  step_nzv(all_predictors()) 
+
+nba_recipe
+
+```
+  
+  
+  
+# Conclusion
+
+In this analysis, we explore the prediction the player performance in the next game based on their performance statistics in the previous games. This takes a number of player statistics as predictor variables and try to predict the player's points per game (ppg). Predicting the ppg given the previous player's statistics will enable us to have an idea of the form of the player and their likely performance in future games. We found that the response variable of ppg (points per game) ranges from 0 to 36.1 with a mean of 8.396 and a standard deviation of 6.257. We find that there is no significant difference in the median ppg for the different positions. 
+
+  
+  
+
+
